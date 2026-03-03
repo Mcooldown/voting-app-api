@@ -25,16 +25,18 @@ const getUserById = async (id) => {
 };
 
 const updateUser = async (id, updates) => {
-  const user = await User.findOneAndUpdate(
-    { _id: id, role: 'user' },
-    { name: updates.name },
-    { new: true, runValidators: true }
-  ).select('-password');
+  const user = await User.findOne({ _id: id, role: 'user' }).select('+password');
 
   if (!user) {
     throw Object.assign(new Error('User not found'), { statusCode: 404 });
   }
 
+  if (updates.name     !== undefined) user.name     = updates.name;
+  if (updates.email    !== undefined) user.email    = updates.email;
+  if (updates.password !== undefined) user.password = updates.password;
+
+  await user.save();
+  user.password = undefined;
   return user;
 };
 

@@ -248,7 +248,7 @@ describe('PUT /api/users/:id', () => {
     expect(res.body.data.user.name).toBe('Updated Name');
   });
 
-  it('should return 422 when trying to update email', async () => {
+  it('should update the user email successfully', async () => {
     const token = await getAdminToken();
     const created = await User.create(userPayload);
     const userId = created._id.toString();
@@ -256,9 +256,47 @@ describe('PUT /api/users/:id', () => {
     const res = await request(app)
       .put(`/api/users/${userId}`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ email: 'newemail@test.com' });
+      .send({ email: 'updated@test.com' });
 
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data.user.email).toBe('updated@test.com');
+  });
+
+  it('should update the user password successfully when password is provided', async () => {
+    const token = await getAdminToken();
+    const created = await User.create(userPayload);
+    const userId = created._id.toString();
+
+    const res = await request(app)
+      .put(`/api/users/${userId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ password: 'NewPass1!' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data.user).not.toHaveProperty('password');
+
+    // Verify new password works for login
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ email: userPayload.email, password: 'NewPass1!' });
+    expect(loginRes.statusCode).toBe(200);
+  });
+
+  it('should not change password when password is not provided in request body', async () => {
+    const token = await getAdminToken();
+    const created = await User.create(userPayload);
+    const userId = created._id.toString();
+
+    await request(app)
+      .put(`/api/users/${userId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'New Name Only' });
+
+    // Original password should still work
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ email: userPayload.email, password: STRONG_PASSWORD });
+    expect(loginRes.statusCode).toBe(200);
   });
 
   it('should return 422 when trying to update role', async () => {
@@ -274,19 +312,6 @@ describe('PUT /api/users/:id', () => {
     expect(res.statusCode).toBe(422);
   });
 
-  it('should return 422 when trying to update password', async () => {
-    const token = await getAdminToken();
-    const created = await User.create(userPayload);
-    const userId = created._id.toString();
-
-    const res = await request(app)
-      .put(`/api/users/${userId}`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ password: 'NewPass1!' });
-
-    expect(res.statusCode).toBe(422);
-  });
-
   it('should return 422 when name is invalid (too short)', async () => {
     const token = await getAdminToken();
     const created = await User.create(userPayload);
@@ -296,6 +321,19 @@ describe('PUT /api/users/:id', () => {
       .put(`/api/users/${userId}`)
       .set('Authorization', `Bearer ${token}`)
       .send({ name: 'X' });
+
+    expect(res.statusCode).toBe(422);
+  });
+
+  it('should return 422 when password does not meet strength requirements', async () => {
+    const token = await getAdminToken();
+    const created = await User.create(userPayload);
+    const userId = created._id.toString();
+
+    const res = await request(app)
+      .put(`/api/users/${userId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ password: 'weakpassword' });
 
     expect(res.statusCode).toBe(422);
   });
